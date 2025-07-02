@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Last Scanned</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #111;
+            color: #0f0;
+            font-family: monospace, monospace;
+            user-select: none;
+        }
+
+        #last-scanned-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="last-scanned-text">Waiting for data....</div>
+
+    <script>
+        const textElement = document.getElementById('last-scanned-text');
+
+        function adjustFontSize() {
+            const containerWidth = window.innerWidth * 0.95;
+            const maxFontSize = 150;
+            const minFontSize = 10;
+
+            let fontSize = maxFontSize;
+            textElement.style.fontSize = fontSize + 'px';
+
+            while (textElement.scrollWidth > containerWidth && fontSize > minFontSize) {
+                fontSize -= 1;
+                textElement.style.fontSize = fontSize + 'px';
+            }
+        }
+
+        window.addEventListener('resize', adjustFontSize);
+
+        const observer = new MutationObserver(adjustFontSize);
+        observer.observe(textElement, { childList: true, characterData: true, subtree: true });
+
+        adjustFontSize();
+
+        // Example IPC listener (adjust as per your Electron app)
+        const { ipcRenderer } = require('electron');
+
+        ipcRenderer.on('last-scanned-data', (event, data) => {
+            // Remove everything before first '|' including the pipe itself
+            const pipeIndex = data.indexOf('|');
+            const textToShow = pipeIndex !== -1 ? data.slice(pipeIndex + 1) : data;
+
+            textElement.textContent = textToShow || 'Waiting for data....';
+        });
+    </script>
+
+</body>
+
+</html>

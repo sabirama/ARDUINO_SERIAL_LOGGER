@@ -5,6 +5,9 @@ const fs = require('fs');
 const path = require('path');
 
 let mainWindow;
+let headerEditorWindow;
+let lastScannedWindow = null;
+
 let port;
 const BAUD_RATE = 115200; // MUST match Arduino's Serial.begin()
 
@@ -15,8 +18,152 @@ let currentPortIndex = 0;
 let isConnected = false;
 let csvFilePath = '';
 let logMessages = [];
+let defaultHeaders = ['Timestamp', 'Data1', 'Data2', 'Data3', 'Data4', 'Data5'];
+let currentHeaders = [...defaultHeaders];
 
-// IPC handlers for save functionality
+// MARK: Load saved headers on startup
+function loadSavedHeaders() {
+  const configPath = path.join(__dirname, 'headers_config.json');
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.headers && Array.isArray(config.headers)) {
+        currentHeaders = config.headers;
+        log('Loaded saved headers from config');
+      }
+    }
+  } catch (error) {
+    log('Using default headers (config load failed)');
+    currentHeaders = [...defaultHeaders];
+  }
+}
+
+function openHeaderEditor() {
+  if (headerEditorWindow) {
+    headerEditorWindow.focus();
+    return;
+  }
+
+  headerEditorWindow = new BrowserWindow({
+    width: 600,
+    height: 500,
+    parent: mainWindow,
+    modal: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    title: 'CSV Header Editor',
+    autoHideMenuBar: true,
+  });
+
+  headerEditorWindow.loadFile('header-editor.html');
+
+  headerEditorWindow.on('closed', () => {
+    headerEditorWindow = null;
+  });
+}
+
+// IPC handlers for header management
+ipcMain.handle('get-headers', () => {
+  return currentHeaders;
+});
+
+ipcMain.handle('save-headers', (event, headers) => {
+  try {
+    // Validate headers
+    if (!Array.isArray(headers) || headers.length < 2) {
+      return { success: false, error: 'Headers must be an array with at least 2 items (Timestamp + 1 data field)' };
+    }
+
+    // Ensure first three headers are always the system headers
+    headers[0] = 'Timestamp';
+
+    currentHeaders = headers;
+
+    // Save headers to a config file
+    const configPath = path.join(__dirname, 'headers_config.json');
+    fs.writeFileSync(configPath, JSON.stringify({ headers: currentHeaders }, null, 2));
+
+    log(`Headers updated: ${currentHeaders.length} columns configured`);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('reset-headers', () => {
+  currentHeaders = [...defaultHeaders];
+  const configPath = path.join(__dirname, 'headers_config.json');
+  try {
+    if (fs.existsSync(configPath)) {
+      fs.unlinkSync(configPath);
+    }
+  } catch (error) {
+    console.error('Error removing config file:', error);
+  }
+  log('Headers reset to default');
+  return { success: true };
+});
+
+ipcMain.handle('open-header-editor', () => {
+  openHeaderEditor();
+});
+
+// MARK: Open last scanned data window
+function openLastScannedWindow() {
+  if (lastScannedWindow) {
+    lastScannedWindow.focus();
+    return;
+  }
+
+  lastScannedWindow = new BrowserWindow({
+    width: 600,
+    height: 200,
+    frame: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    autoHideMenuBar: true,
+    title: 'Last Scanned Data',
+  });
+
+  lastScannedWindow.loadFile('last-scanned.html');
+
+  lastScannedWindow.on('closed', () => {
+    lastScannedWindow = null;
+  });
+}
+
+function createLastScannedWindow() {
+  if (lastScannedWindow && !lastScannedWindow.isDestroyed()) {
+    lastScannedWindow.focus();
+    return;
+  }
+
+  lastScannedWindow = new BrowserWindow({
+    width: 400,
+    height: 200,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    autoHideMenuBar: true
+  });
+
+  lastScannedWindow.loadFile('last-scanned.html');
+
+  lastScannedWindow.on('closed', () => {
+    lastScannedWindow = null;
+  });
+}
+
+ipcMain.handle('open-last-scanned-window', () => {
+  createLastScannedWindow();
+});
+
+//MARK: IPC handlers for save functionality
 ipcMain.handle('save-csv-as', async () => {
   if (!csvFilePath || !fs.existsSync(csvFilePath)) {
     return { success: false, error: 'No CSV file available to save' };
@@ -169,7 +316,7 @@ function initializeCSV() {
   // Check if file exists, if not create with header
   try {
     if (!fs.existsSync(csvFilePath)) {
-      const header = 'Timestamp,Type,Port,Message\n';
+      const header = currentHeaders.join(',') + '\n';
       fs.writeFileSync(csvFilePath, header);
       log(`CSV log file created: ${path.basename(csvFilePath)}`);
     } else {
@@ -184,11 +331,15 @@ function initializeCSV() {
   }
 }
 
-function writeToCSV(type, port, message) {
+function writeToCSV(message) {
   if (!csvFilePath) return;
 
   const timestamp = new Date().toISOString();
-  const csvLine = `"${timestamp}","${type}","${port || 'N/A'}","${message.replace(/"/g, '""')}"\n`;
+
+  // Construct a pipe-delimited row: Timestamp + message split by "|"
+  const messageParts = message.split('|').map(p => p.trim());
+  const csvFields = [timestamp, ...messageParts];
+  const csvLine = csvFields.join(',') + '\n';
 
   // Retry mechanism for file access
   const maxRetries = 3;
@@ -224,15 +375,17 @@ function log(message) {
   }
 
 }
-
 function sendData(data) {
   if (mainWindow && mainWindow.webContents) {
     mainWindow.webContents.send('data', data);
   }
 
-  // Write data to CSV
+  if (lastScannedWindow && lastScannedWindow.webContents) {
+    lastScannedWindow.webContents.send('last-scanned-data', data);
+  }
+
   const currentPort = currentPortIndex < PORTS_TO_CHECK.length ? PORTS_TO_CHECK[currentPortIndex] : '';
-  writeToCSV('DATA', currentPort, data);
+  writeToCSV(data);
 }
 
 function tryNextPort() {
@@ -333,7 +486,8 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false // Required for older Electron versions with nodeIntegration
-    }
+    },
+    autoHideMenuBar: true,
   });
 
   mainWindow.loadFile('index.html');
@@ -349,11 +503,14 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  loadSavedHeaders();
   createWindow();
+  openLastScannedWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      openLastScannedWindow();
     }
   });
 });
@@ -369,3 +526,4 @@ app.on('before-quit', () => {
     port.close();
   }
 });
+

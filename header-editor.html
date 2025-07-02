@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Edit CSV Headers</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    #headersContainer {
+      margin-bottom: 20px;
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    .header-row input {
+      flex: 1;
+      padding: 5px;
+    }
+    .header-row button {
+      margin-left: 8px;
+    }
+    #controls {
+      margin-top: 15px;
+    }
+    button {
+      padding: 6px 12px;
+    }
+  </style>
+</head>
+<body>
+  <h2>Edit CSV Headers</h2>
+
+  <div id="headersContainer"></div>
+  
+  <button id="addHeader">+ Add Header</button>
+
+  <div id="controls">
+    <button id="saveHeaders">💾 Save</button>
+    <button id="resetHeaders">🔁 Reset</button>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    async function loadHeaders() {
+      const headers = await ipcRenderer.invoke('get-headers');
+      const container = document.getElementById('headersContainer');
+      container.innerHTML = '';
+
+      headers.forEach((header, index) => {
+        const row = document.createElement('div');
+        row.className = 'header-row';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = header;
+        input.dataset.index = index;
+        input.disabled = index < 1; // Timestamp is locked
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '❌';
+        deleteBtn.disabled = index < 1;
+        deleteBtn.onclick = () => {
+          row.remove();
+        };
+
+        row.appendChild(input);
+        row.appendChild(deleteBtn);
+        container.appendChild(row);
+      });
+    }
+
+    document.getElementById('addHeader').onclick = () => {
+      const container = document.getElementById('headersContainer');
+      const row = document.createElement('div');
+      row.className = 'header-row';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'New Header';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = '❌';
+      deleteBtn.onclick = () => {
+        row.remove();
+      };
+
+      row.appendChild(input);
+      row.appendChild(deleteBtn);
+      container.appendChild(row);
+    };
+
+    document.getElementById('saveHeaders').onclick = async () => {
+      const inputs = document.querySelectorAll('#headersContainer input');
+      const newHeaders = Array.from(inputs).map(i => i.value.trim());
+
+      // Minimal validation
+      if (newHeaders.length < 3 || newHeaders.some(h => h === '')) {
+        alert('Each header must have text and at least 3 headers must exist.');
+        return;
+      }
+
+      const result = await ipcRenderer.invoke('save-headers', newHeaders);
+      if (result.success) {
+        alert('✅ Headers saved!');
+        loadHeaders();
+      } else {
+        alert('❌ Error: ' + result.error);
+      }
+    };
+
+    document.getElementById('resetHeaders').onclick = async () => {
+      const result = await ipcRenderer.invoke('reset-headers');
+      if (result.success) {
+        alert('✅ Headers reset to default.');
+        loadHeaders();
+      }
+    };
+
+    loadHeaders();
+  </script>
+</body>
+</html>

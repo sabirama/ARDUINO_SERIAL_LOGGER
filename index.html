@@ -1,370 +1,109 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
-    <title>Arduino Finder</title>
+    <title>Arduino Serial Logger</title>
     <style>
-        body { 
-            font-family: Arial, sans-serif; 
-            padding: 20px; 
-            background: #f0f0f0;
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 10px;
+            background: #f4f4f4;
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+
         h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
+            font-size: 20px;
         }
-        #log { 
-            color: #2196F3; 
-            font-weight: bold; 
-            font-size: 14px;
-            margin-bottom: 15px;
-            padding: 15px;
-            background: #E3F2FD;
-            border-radius: 4px;
-            border-left: 4px solid #2196F3;
-            max-height: 200px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-        }
-        .log-line {
-            display: block;
-            margin: 2px 0;
-            padding: 2px 0;
-            border-bottom: 1px solid rgba(33, 150, 243, 0.1);
-        }
-        .log-line:last-child {
-            border-bottom: none;
-        }
+
         #data {
-            height: 400px; 
+            height: 200px;
             overflow-y: auto;
-            border: 1px solid #ddd; 
-            padding: 15px;
-            font-family: 'Courier New', monospace; 
-            background: #1e1e1e;
-            color: #00ff00;
-            border-radius: 4px;
-            line-height: 1.4;
-        }
-        .data-line {
-            display: block;
-            margin: 2px 0;
-            padding: 1px 0;
-            word-wrap: break-word;
-        }
-        .status {
-            margin-top: 10px;
-            font-size: 14px;
-            color: #666;
-        }
-        .csv-controls {
-            margin-top: 15px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 4px;
-            border: 1px solid #e9ecef;
-        }
-        .csv-info {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
-            font-size: 12px;
-        }
-        .button-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        .save-btn {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s;
-            flex: 1;
-            min-width: 140px;
-        }
-        .save-btn:hover {
-            background: #218838;
-        }
-        .save-btn:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-        }
-        .browse-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s;
-            flex: 1;
-            min-width: 140px;
-        }
-        .browse-btn:hover {
-            background: #0056b3;
-        }
-        .csv-list {
-            margin-top: 10px;
             padding: 10px;
             background: #fff;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-            max-height: 150px;
-            overflow-y: auto;
-            font-size: 12px;
+            border: 1px solid #ccc;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
         }
-        .csv-file-item {
-            padding: 5px 0;
-            border-bottom: 1px solid #f8f9fa;
+
+        #controls {
+            margin-bottom: 10px;
         }
-        .csv-file-item:last-child {
-            border-bottom: none;
+
+        button.menu {
+            margin-right: 10px;
+            padding: 8px 12px;
+        }
+
+        .hidden {
+            display: none;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>🔍 Arduino Finder</h1>
-        <div id="log">Initializing...</div>
-        <div id="data"></div>
-        <div class="status">
-            <strong>Checking ports:</strong> COM3, COM4, COM5, COM6<br>
-            <strong>Baud rate:</strong> 9600<br>
-            <strong>CSV Log:</strong> <span id="csvFileName">Initializing...</span>
-        </div>
 
-        <div class="csv-controls">
-            <div class="csv-info">
-                <div><strong>File Size:</strong> <span id="csvSize">-</span></div>
-                <div><strong>Entries:</strong> <span id="csvEntries">-</span></div>
-                <div><strong>Last Modified:</strong> <span id="csvModified">-</span></div>
-                <div><strong>Status:</strong> <span id="csvStatus">Loading...</span></div>
-            </div>
-            <div class="button-group">
-                <button id="saveBtn" class="save-btn" disabled>💾 Save Current CSV</button>
-                <button id="browseBtn" class="browse-btn">📁 Browse & Save CSV</button>
-            </div>
-            <div id="csvList" class="csv-list" style="display: none;">
-                <div><strong>Available CSV Files:</strong></div>
-                <div id="csvFilesList"></div>
-            </div>
-        </div>
+<body>
+    <h1>Arduino Serial Logger</h1>
+
+    <div id="controls">
+        <button id="saveCsv" class="menu">Save CSV As</button>
+        <button id="browseCsv" class="menu">Browse & Save CSV</button>
+        <button id="editHeaders" class="menu">Edit Headers</button>
+        <button id="resetHeaders" class="menu">Reset Headers</button>
     </div>
 
+    <h2>Logs
+        <button id="toggleLive">Toggle Live Data</button>
+        <button id="open-last-scanned">Show Last Scanned</button>
+    </h2>
+    <div id="data">Waiting for data...</div>
+
     <script>
-        try {
-            const { ipcRenderer } = require('electron');
-            
-            // Expose APIs for the renderer process
-            window.electronAPI = {
-                saveCSVAs: () => ipcRenderer.invoke('save-csv-as'),
-                getCSVInfo: () => ipcRenderer.invoke('get-csv-info'),
-                browseAndSaveCSV: () => ipcRenderer.invoke('browse-and-save-csv'),
-                getAllCSVFiles: () => ipcRenderer.invoke('get-all-csv-files')
-            };
-            
-            let dataCount = 0;
-            
-            // Update CSV info periodically
-            function updateCSVInfo() {
-                window.electronAPI.getCSVInfo().then(info => {
-                    if (info.exists) {
-                        document.getElementById('csvSize').textContent = formatBytes(info.size);
-                        document.getElementById('csvEntries').textContent = info.entries.toLocaleString();
-                        document.getElementById('csvModified').textContent = new Date(info.lastModified).toLocaleTimeString();
-                        document.getElementById('csvStatus').textContent = 'Active';
-                        document.getElementById('saveBtn').disabled = false;
-                    } else {
-                        document.getElementById('csvStatus').textContent = info.error || 'Not available';
-                        document.getElementById('saveBtn').disabled = true;
-                    }
-                }).catch(err => {
-                    document.getElementById('csvStatus').textContent = 'Error loading info';
-                    console.error('CSV info error:', err);
-                });
-            }
-            
-            function formatBytes(bytes) {
-                if (bytes === 0) return '0 Bytes';
-                const k = 1024;
-                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            }
-            
-            // Save current CSV function
-            document.getElementById('saveBtn').addEventListener('click', async () => {
-                const btn = document.getElementById('saveBtn');
-                btn.disabled = true;
-                btn.textContent = '💾 Saving...';
-                
-                try {
-                    const result = await window.electronAPI.saveCSVAs();
-                    if (result.success) {
-                        btn.textContent = '✅ Saved!';
-                        setTimeout(() => {
-                            btn.textContent = '💾 Save Current CSV';
-                            btn.disabled = false;
-                        }, 2000);
-                    } else {
-                        btn.textContent = '❌ Failed';
-                        console.error('Save failed:', result.error);
-                        setTimeout(() => {
-                            btn.textContent = '💾 Save Current CSV';
-                            btn.disabled = false;
-                        }, 2000);
-                    }
-                } catch (error) {
-                    btn.textContent = '❌ Error';
-                    console.error('Save error:', error);
-                    setTimeout(() => {
-                        btn.textContent = '💾 Save Current CSV';
-                        btn.disabled = false;
-                    }, 2000);
-                }
-            });
+        const { ipcRenderer } = require('electron');
 
-            // Browse and save CSV function
-            document.getElementById('browseBtn').addEventListener('click', async () => {
-                const btn = document.getElementById('browseBtn');
-                const originalText = btn.textContent;
-                btn.disabled = true;
-                btn.textContent = '📁 Loading...';
-                
-                try {
-                    const result = await window.electronAPI.browseAndSaveCSV();
-                    if (result.success) {
-                        btn.textContent = '✅ Saved!';
-                        setTimeout(() => {
-                            btn.textContent = originalText;
-                            btn.disabled = false;
-                        }, 2000);
-                    } else {
-                        if (result.error !== 'Selection cancelled' && result.error !== 'Save cancelled') {
-                            btn.textContent = '❌ Failed';
-                            console.error('Browse save failed:', result.error);
-                        } else {
-                            btn.textContent = originalText;
-                        }
-                        setTimeout(() => {
-                            btn.textContent = originalText;
-                            btn.disabled = false;
-                        }, result.error.includes('cancelled') ? 0 : 2000);
-                    }
-                } catch (error) {
-                    btn.textContent = '❌ Error';
-                    console.error('Browse save error:', error);
-                    setTimeout(() => {
-                        btn.textContent = originalText;
-                        btn.disabled = false;
-                    }, 2000);
-                }
-            });
+        const logEl = document.getElementById('log');
+        const dataEl = document.getElementById('data');
+        const lastDataEl = document.getElementById('lastData');
 
-            // Show CSV files list
-            async function updateCSVFilesList() {
-                try {
-                    const files = await window.electronAPI.getAllCSVFiles();
-                    const listEl = document.getElementById('csvFilesList');
-                    const containerEl = document.getElementById('csvList');
-                    
-                    if (files.length > 0) {
-                        listEl.innerHTML = files.map(file => 
-                            `<div class="csv-file-item">
-                                <strong>${file.name}</strong><br>
-                                ${formatBytes(file.size)} • ${file.entries.toLocaleString()} entries • ${file.date}
-                            </div>`
-                        ).join('');
-                        containerEl.style.display = 'block';
-                    } else {
-                        containerEl.style.display = 'none';
-                    }
-                } catch (error) {
-                    console.error('Error loading CSV files list:', error);
-                }
+        ipcRenderer.on('log', (_, messages) => {
+            logEl.textContent = messages.join('\n');
+            logEl.scrollTop = logEl.scrollHeight;
+        });
+
+        ipcRenderer.on('data', (_, data) => {
+            dataEl.textContent += data + '\n';
+            dataEl.scrollTop = dataEl.scrollHeight;
+            lastDataEl.textContent = data.trim().replace(/^.*?\|/, '').trim();
+        });
+
+        document.getElementById('open-last-scanned').addEventListener('click', () => {
+            ipcRenderer.invoke('open-last-scanned-window');
+        });
+
+        document.getElementById('saveCsv').onclick = async () => {
+            const result = await ipcRenderer.invoke('save-csv-as');
+            alert(result.success ? `CSV saved to:\n${result.filePath}` : `Error:\n${result.error}`);
+        };
+
+        document.getElementById('browseCsv').onclick = async () => {
+            const result = await ipcRenderer.invoke('browse-and-save-csv');
+            alert(result.success ? `Saved ${result.originalFile} to:\n${result.filePath}` : `Error:\n${result.error}`);
+        };
+
+        document.getElementById('editHeaders').onclick = () => {
+            ipcRenderer.invoke('open-header-editor');
+        };
+
+        document.getElementById('resetHeaders').onclick = async () => {
+            if (confirm('Reset headers to default?')) {
+                await ipcRenderer.invoke('reset-headers');
+                alert('Headers reset.');
             }
-            
-            // Update CSV info every 5 seconds and also update files list
-            setInterval(() => {
-                updateCSVInfo();
-                updateCSVFilesList();
-            }, 5000);
-            
-            // Initial updates after a short delay
-            setTimeout(() => {
-                updateCSVInfo();
-                updateCSVFilesList();
-            }, 1000);
-            
-            ipcRenderer.on('log', (_, messages) => {
-                const logEl = document.getElementById('log');
-                if (Array.isArray(messages)) {
-                    // Clear and rebuild with HTML elements
-                    logEl.innerHTML = '';
-                    messages.forEach(msg => {
-                        const timestamp = new Date().toLocaleTimeString();
-                        const logLine = document.createElement('div');
-                        logLine.className = 'log-line';
-                        logLine.textContent = `[${timestamp}] ${msg}`;
-                        logEl.appendChild(logLine);
-                    });
-                    
-                    // Update CSV filename
-                    const csvMessage = messages.find(msg => msg.includes('CSV log file created:') || msg.includes('Using existing CSV log file:'));
-                    if (csvMessage) {
-                        const fileName = csvMessage.split(': ')[1];
-                        document.getElementById('csvFileName').textContent = fileName;
-                    }
-                } else {
-                    // Fallback for single message
-                    const timestamp = new Date().toLocaleTimeString();
-                    const logLine = document.createElement('div');
-                    logLine.className = 'log-line';
-                    logLine.textContent = `[${timestamp}] ${messages}`;
-                    logEl.appendChild(logLine);
-                }
-                logEl.scrollTop = logEl.scrollHeight;
-                console.log('Log:', messages);
-            });
-            
-            ipcRenderer.on('data', (_, data) => {
-                const el = document.getElementById('data');
-                dataCount++;
-                const timestamp = new Date().toLocaleTimeString();
-                
-                // Create a new div element for each data line
-                const dataLine = document.createElement('div');
-                dataLine.className = 'data-line';
-                dataLine.textContent = `[${timestamp}] ${data}`;
-                
-                el.appendChild(dataLine);
-                el.scrollTop = el.scrollHeight;
-                console.log('Data:', data);
-            });
-            
-            console.log('IPC listeners registered successfully');
-            
-        } catch (error) {
-            console.error('Failed to initialize IPC:', error);
-            document.getElementById('log').textContent = 'Error: Failed to initialize IPC communication';
-            document.getElementById('log').style.color = 'red';
-        }
+        };
+
+        document.getElementById('toggleLive').onclick = () => {
+            dataEl.classList.toggle('hidden');
+        };
     </script>
 </body>
+
 </html>
